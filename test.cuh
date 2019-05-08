@@ -9,7 +9,7 @@
 #ifndef TEST
 #define TEST
 
-__host__ void test(char*, int, int, int); 
+__host__ void test(char*, int, int, int, FILE*); 
 __host__ void run(int*, int, char*, int, char*, int, int*, int*, int, int); 
 __host__ void printTiming(int, int);
 __global__ void warmup();
@@ -44,8 +44,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 __global__ void warmup(){}
 
-__host__ void test(char* T, int tsize, int flag_W, int flag_Func){
-	int size = tsize; //Largest size runable with synced versions
+__host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
+	int size = tsize; 
 	printf("Testing with text size %d, and pattern sizes 1:1/2*size+1\n", size);
 	if(flag_W == 1){
 		printf("\tUsing GPU witness function.\n"); 
@@ -55,12 +55,15 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func){
 	}
 	if(flag_Func == 1){
 		printf("\tUsing Synced Version w/o Shared mem Search Alg.\n");
+		fputs("Pattern Size;Naive Serial;Optimal Serial;Synced Global\n", data);   
 	}
 	if(flag_Func == 2){
 		printf("\tUsing Synced Version w/ Shared mem Search Alg.\n");
+		fputs("Pattern Size;Naive Serial;Optimal Serial;Synced Shared\n", data);   
 	}
 	if(flag_Func == 3){
 		printf("\tUsing Multiple Kernel Version Search Alg. \n");
+		fputs("Pattern Size;Naive Serial;Optimal Serial;Multiple\n", data);   
 	}
 
 	//Setup memory for gpu version
@@ -95,7 +98,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func){
 	int success = 1;  
 	//Prep phrase for timing reports
 	printf("The average runtimes in 1000 iterations:\n"); 
-	//this doesn't want to work for bigger p................
+	//Can't run larger than 2048 because of thread constraints
 	for (int psize=1; psize <= 2048; psize *= 2){ //Can't run with bigger pattern.  
 		int wsize = 0;
 		for (int iter=0; iter < 1; iter++){
@@ -105,9 +108,6 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func){
 
 			srand(time(NULL));
 			ind = rand() % (size - psize); 
-			//ind = 65; //Failed for multi, worked afterwards
-			//ind = 1750; //""
-			//ind = 80; //""
 			P = T + ind;
 
 			//Run the serial algorithm
@@ -183,20 +183,6 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func){
 				if (results[i] != match[i+1]){
 					printf("Mismatch: %d(GPU) != %d(CPU)\n", results[i], match[i+1]); 
 					success = 0; 
-					//verify no period
-					/*int matchF = testPeriod(psize, P); 
-
-					if (matchF > 0){
-						printf("\tSTOPPED WHEN PERIOD FOUND, pattern size was %d\n", psize);
-						success = 1; 
-						end = 1; 
-						break; 
-					}else{ printf("\tERROR, MISMATCH & NO PERIOD, pattern size was %d\n", psize);
-						printf("Count w/ Pattern size = %d: %d (GPU), %d (CPU)\n", psize, count, match[0]);
-						int block = size/wsize;
-						if (tsize % wsize > 0){block += 1;}
-						
-					} */
 					printf("\tERROR, MISMATCH, psize=%d, wsize=%d, loc=%d\n", psize, wsize, ind);
 					printf("Count w/ Pattern size = %d: %d (GPU), %d (CPU)\n", psize, count, match[0]);
 					int block = size/wsize;
@@ -226,10 +212,12 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func){
 			printf("\t\tWitness creation time: %f\n", witTime/1000); 
 			if (flag_Func < 3){
 				printf("\t\tSearch time: %f\n", time1/1000);
+				fprintf(data, "%d;%f;%f;%f\n", psize, ser/1000, (kmp+fail)/1000, time1/1000); 
 			}
 			if (flag_Func == 3){
 				printf("\t\tCreate tree time: %f\n", time1/1000);
 				printf("\t\tFinish search time: %f\n", time2/1000); 
+				fprintf(data, "%d;%f;%f;%f\n", psize, ser/1000, (kmp+fail)/1000, (time1+time2)/1000);
 			}
 			printf("\t\tTotal time: %f\n\n", copy1 + (copy1b + copy2 + clean + witTime + time1 + time2)/1000);
 			copy1b = 0;
@@ -257,11 +245,10 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func){
 	cudaFree(devTree); 
 	free(matchGPU);
 	free(results);
-	free(match); 
+	free(match);  
 }
 
-__host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int* R, int* tree, int flag_W, int flag_Func){
-	//printf("TSIZE = %d\n", tsize);  
+__host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int* R, int* tree, int flag_W, int flag_Func){ 
 	float temp; 
 	int* wit = (int *) malloc(sizeof(int)*wsize);
 	char* pat = (char *) malloc(sizeof(int)*psize); 
@@ -287,8 +274,6 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 	//if flag_Func == 2, use search_synced_shared
 	//if flag_Func == 3, use multiple kernel version w/o constant mem 
 	if (flag_Func == 1){
-		//printf("Blocks: %d, Threads: %d\n", tsize/wsize, wsize); 
-		//printf("tsize = %d, wsize = %d\n", tsize, wsize); 
 		int block = tsize/wsize;
 		if (tsize % wsize > 0){block += 1;}
 		gstart();

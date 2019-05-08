@@ -16,13 +16,12 @@ __global__ void search_Finish(int, char*, int, char*, int, int*, int*);
 __global__ void createTreeLevel(int* W, int wsize, char*P, int psize, char* T, int tsize, int* tree, int s){	
 	//Setup
 	int ID = threadIdx.x + blockIdx.x*blockDim.x;
-	//if (ID == 0){printf("In create tree\n"); }
 	int tID = ID % wsize;
 	int bID = ID / wsize;
 	int blockStart = bID*wsize;
 
 	//If this is the first level, add initial leaves
-	if (s == 0){
+	if ((s == 0)&&(ID < tsize)){
 		tree[ID] = ID; 
 	}
 
@@ -32,9 +31,9 @@ __global__ void createTreeLevel(int* W, int wsize, char*P, int psize, char* T, i
 			int i = tree[2*s*tID + blockStart];
 			int j = tree[2*s*tID + s + blockStart];
 			tree[2*s*tID + blockStart] = duel(T, P, W, i, j);
+			if (2*s*tID + s + blockStart >= tsize){printf("OoB ERROR\n");}
 		}
 	}
-	//if (ID == 0){printf("Created tree\n"); }
 }
 
 __global__ void search_Finish(int wsize, char* P, int psize, char* T, int tsize, int* match, int* tree){
@@ -57,18 +56,10 @@ __global__ void search_Finish(int wsize, char* P, int psize, char* T, int tsize,
 			i++; 
 		}
 
+		if (ID >= tsize){printf("error in match\n");}
 		//Store result
-		match[ID] = m; 
+		match[ID] = m;  
 	}
-	//if (ID == 0){printf("Finished search w/psize = %d\n", psize); }
-	/*//DEBUG
-	__syncthreads(); 
-	if (ID == 0){
-		for (int j=0; j<tsize/wsize; j++){
-			printf("%d ", match[j]);
-		}
-		printf("\n"); 
-	}//*/
 }
 
 #endif
