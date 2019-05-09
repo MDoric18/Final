@@ -5,7 +5,7 @@
 #define SYNC
 
 __global__ void search_synced(int*, int, char*, int, char*, int, int*, int*);
-__global__ void search_synced(int*, int, char*, int, char*, int, int*);
+__global__ void search_synced_shared(int*, int, char*, int, char*, int, int*);
 
 #endif
 
@@ -49,6 +49,7 @@ __global__ void search_synced(int* W, int wsize, char* P, int psize, char* T, in
 		}
 
 		//Store the result
+		if (blockIdx.x > tsize){printf("M ERROR SS\n");}
 		match[blockIdx.x] = m;
 	}
 }

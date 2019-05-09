@@ -46,15 +46,16 @@ int main(){
 	fclose(data);
 
 	//Test: synced parallel version w/shared tree and cpu witness
-	fopen("SyncedShared.txt", "w");
+	data = fopen("SyncedShared.txt", "w");
 	test(text, tsize, 2, 2, data); 
 	printf("\n\n"); 
 	fflush(stdout);//
 	fclose(data);
 
 	//Test: multiple kernel version and cpu witness
-	fopen("Multiple.txt", "w");
+	data = fopen("Multiple.txt", "w");
 	test(text, tsize, 2, 3, data); 
+	printf("\n\n"); 
 	fflush(stdout); 
 	fclose(data); 
 }

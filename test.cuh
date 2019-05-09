@@ -29,6 +29,7 @@ float clean = 0;
 float ser = 0; 
 float kmp = 0; 
 float fail = 0; 
+int ind; 
 
 //COPIED FROM CLASS CODE
 #define gerror(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -103,7 +104,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 		int wsize = 0;
 		for (int iter=0; iter < 1; iter++){
 			//Pick a random location in T to be P with no period
-			int ind;
+			//int ind;
 			char* P;
 
 			srand(time(NULL));
@@ -122,7 +123,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 			cend(&temp);
 			fail += temp;
 
-			cstart();
+			/*cstart();
 			KMP(F, P, psize, T, size, matchKMP);
 			cend(&temp);
 			kmp += temp; 
@@ -133,7 +134,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 					printf("KMP FAILED\n");
 					break; 
 				}
-			}
+			}//*/
 
 			//Calculate wsize
 			wsize = psize/2;
@@ -248,8 +249,8 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int* R, int* tree, int flag_W, int flag_Func){ 
 	float temp; 
 	int* wit = (int *) malloc(sizeof(int)*wsize);
-	char* pat = (char *) malloc(sizeof(int)*psize); 
-	cudaMemcpy(pat, P, sizeof(int)*psize, cudaMemcpyDeviceToHost); 
+	char* pat = (char *) malloc(sizeof(char)*psize); 
+	cudaMemcpy(pat, P, sizeof(char)*psize, cudaMemcpyDeviceToHost); 
 	//if flag_W == 1, we get it on the GPU, else get on CPU
 	if (flag_W == 1){
 		gstart();
@@ -310,9 +311,10 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 		gstart();
 		search_Finish<<<block,div>>>(wsize, P, psize, T, tsize, R, tree);
 		gend(&temp);
-		gerror(cudaPeekAtLastError());
 		time2 += temp; 
+		printf("Ind:%d\n", ind); 
 		cudaDeviceSynchronize();
+		gerror(cudaPeekAtLastError());
 	}
 	if ((flag_Func > 3)||(flag_Func < 1)){ 
 		printf("ERROR flag_Func\n");

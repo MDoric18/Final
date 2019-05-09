@@ -55,7 +55,7 @@ __global__ void search_Finish(int wsize, char* P, int psize, char* T, int tsize,
 				m = -1;
 				break;
 			}
-			i++; 
+			i++;
 		}
 
 		if (ID >= tsize){printf("error in match\n");}
