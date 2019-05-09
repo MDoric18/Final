@@ -31,7 +31,7 @@ __global__ void createTreeLevel(int* W, int wsize, char*P, int psize, char* T, i
 			int i = tree[2*s*tID + blockStart];
 			int j = tree[2*s*tID + s + blockStart];
 			tree[2*s*tID + blockStart] = duel(T, P, W, i, j);
-			if (2*s*tID + s + blockStart >= tsize){printf("OoB ERROR\n");}
+			if (2*s*tID + blockStart >= tsize){printf("OoB ERROR\n");}
 		}
 	}
 }
@@ -39,17 +39,19 @@ __global__ void createTreeLevel(int* W, int wsize, char*P, int psize, char* T, i
 __global__ void search_Finish(int wsize, char* P, int psize, char* T, int tsize, int* match, int* tree){
 	//Setup
 	int ID = threadIdx.x + blockIdx.x*blockDim.x;
-
 	//Check for pattern
 	if (ID*wsize < tsize){
 		int i = 0;
 		int m = tree[ID*wsize]; 
+		if (m >= tsize){printf("M ERROR\n");}
 		while (i < psize){
 			if (i + m >= tsize){
 				m = -1; //Out of bounds
 				break;
 			}		
 			if (T[i+m] != P[i]){
+				if (i+m >= tsize){printf("T ERROR\n");}
+				if (i >= psize){printf("P ERROR\n");}
 				m = -1;
 				break;
 			}

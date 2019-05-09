@@ -94,7 +94,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 	gend(&temp);
 	copy1 += temp; 
 
-	//Now test, psize must be below 4096 because of synced version thread restraints
+	//Now test, psize must be <=2048 because of synced version thread restraints
 	int success = 1;  
 	//Prep phrase for timing reports
 	printf("The average runtimes in 1000 iterations:\n"); 
@@ -152,7 +152,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 
 			//Copy back results
 			gstart();
-			gerror(cudaMemcpy(matchGPU, devR, size*sizeof(int), cudaMemcpyDeviceToHost)); //Error sometimes occurs here..... illegal mem access
+			gerror(cudaMemcpy(matchGPU, devR, size*sizeof(int), cudaMemcpyDeviceToHost));
 			gend(&temp);
 			copy2 += temp; 
 
@@ -200,7 +200,6 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 			break;
 		}else{
 			//Now print information regarding timing
-			//printf("\t\tPattern size: %d, Location: %d\n", psize, ind);   
 			printf("\t\tPattern size: %d\n", psize); 
 			printf("\t\tNaive serial time: %f\n", ser/1000);
 			printf("\t\tFailure function time: %f\n", fail/1000);
@@ -238,14 +237,12 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 	gerror(cudaFree(devR));
 	gerror(cudaFree(devW)); 
 	gerror(cudaFree(devTree)); 
-	cudaFree(devP);
-	cudaFree(devT);
-	cudaFree(devR);
-	cudaFree(devW);
-	cudaFree(devTree); 
 	free(matchGPU);
+	free(matchKMP);
 	free(results);
-	free(match);  
+	free(match);
+	free(cleanArr);
+	free(F);   
 }
 
 __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int* R, int* tree, int flag_W, int flag_Func){ 
@@ -265,6 +262,7 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 			cstart();
 			witnessCPU(pat, psize, wit, wsize); 
 			cend(&temp);
+			gerror(cudaPeekAtLastError());
 			witTime += temp; 
 			gerror(cudaMemcpy(W, wit, sizeof(int)*wsize, cudaMemcpyHostToDevice)); 
 		}else{ printf("ERROR flag_W\n");} 
@@ -279,6 +277,7 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 		gstart();
 		search_synced<<<block,wsize>>>(W, wsize, P, psize, T, tsize, R, tree);
 		gend(&temp);
+		gerror(cudaPeekAtLastError());
 		time1 += temp; 
 		cudaDeviceSynchronize();
 		
@@ -289,6 +288,7 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 		gstart();
 		search_synced_shared<<<block,wsize>>>(W, wsize, P, psize, T, tsize, R);
 		gend(&temp);
+		gerror(cudaPeekAtLastError());
 		time1 += temp; 
 		cudaDeviceSynchronize();
 	
@@ -303,12 +303,14 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 			createTreeLevel<<<block, div>>>(W, wsize, P, psize, T, tsize, tree, s);	
 		}
 		gend(&temp);
+		gerror(cudaPeekAtLastError());
 		time1 += temp; 
 		cudaDeviceSynchronize();
 
 		gstart();
 		search_Finish<<<block,div>>>(wsize, P, psize, T, tsize, R, tree);
 		gend(&temp);
+		gerror(cudaPeekAtLastError());
 		time2 += temp; 
 		cudaDeviceSynchronize();
 	}
