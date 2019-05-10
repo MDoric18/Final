@@ -39,6 +39,8 @@ __global__ void createTreeLevel(int* W, int wsize, char*P, int psize, char* T, i
 __global__ void search_Finish(int wsize, char* P, int psize, char* T, int tsize, int* match, int* tree){
 	//Setup
 	int ID = threadIdx.x + blockIdx.x*blockDim.x;
+	if (ID == 0){printf("INSIDE\n");}
+	//if ((psize >= 2048)){printf("INSIDE %d\n", psize); }
 	//Check for pattern
 	if (ID*wsize < tsize){
 		int i = 0;
@@ -48,16 +50,15 @@ __global__ void search_Finish(int wsize, char* P, int psize, char* T, int tsize,
 			if (i + m >= tsize){
 				m = -1; //Out of bounds
 				break;
-			}		
+			}	
+			if (i+m >= tsize){printf("T ERROR\n");}
+			if (i >= psize){printf("P ERROR\n");}	
 			if (T[i+m] != P[i]){
-				if (i+m >= tsize){printf("T ERROR\n");}
-				if (i >= psize){printf("P ERROR\n");}
 				m = -1;
 				break;
 			}
 			i++;
-		}
-
+		} 
 		if (ID >= tsize){printf("error in match\n");}
 		//Store result
 		match[ID] = m;  

@@ -22,6 +22,9 @@ __global__ void search_synced(int* W, int wsize, char* P, int psize, char* T, in
 	if (ID < tsize){
 		tree[ID] = ID; 
 	}
+
+	__syncthreads();
+
 	for (int s = 1; s < wsize; s = 2*s){
 		if ((2*s*threadIdx.x+s < wsize)&&(2*s*threadIdx.x+s+blockStart < tsize)){
 			int i = tree[2*s*threadIdx.x + blockStart];
@@ -59,10 +62,13 @@ __global__ void search_synced_shared(int* W, int wsize, char* P, int psize, char
 	
 	//We will use the thread indices to correspond to i's and j's to create the results of the duel tree in the given array, tree. Since we don't need to hold onto the results of the tree, we can just have tree be the size of the witness array for each block, and then call duel repeatedly on every two indices until one is left. Similar to what we did with the vector sum. 
  
-	__shared__ int tree[2048*2]; //Doesn't work with extern.......
+	__shared__ int tree[1024]; //Doesn't work with extern.......
 	int ID = threadIdx.x + blockIdx.x*wsize;
 	tree[threadIdx.x] = ID; 
-	if (threadIdx.x >= 2048*2){printf("SHARED ERROR\n");}
+	
+	__syncthreads(); 
+
+	if (threadIdx.x >= 1024){printf("SHARED ERROR\n");}
 	for (int s = 1; s < wsize; s = 2*s){
 		if ((2*s*threadIdx.x + s < wsize)&&(2*s*threadIdx.x + s + blockIdx.x*wsize < tsize)){ 
 			int i = tree[2*s*threadIdx.x];
@@ -81,6 +87,7 @@ __global__ void search_synced_shared(int* W, int wsize, char* P, int psize, char
 				m = -1; //Out of bounds
 				break;
 			}		
+			if (i+m>= tsize){printf("OoB error\n");}
 			if (T[i+m] != P[i]){
 				m = -1;
 				break;
@@ -89,6 +96,7 @@ __global__ void search_synced_shared(int* W, int wsize, char* P, int psize, char
 		}
 
 		//Store the result
+		if (blockIdx.x >= tsize){printf("SHARED ERROR\n");}
 		match[blockIdx.x] = m;
 	}
 }

@@ -46,7 +46,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 __global__ void warmup(){}
 
 __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
-	int size = tsize; 
+	int size = tsize; //4096*1024; 
 	printf("Testing with text size %d, and pattern sizes 1:1/2*size+1\n", size);
 	if(flag_W == 1){
 		printf("\tUsing GPU witness function.\n"); 
@@ -100,7 +100,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 	//Prep phrase for timing reports
 	printf("The average runtimes in 1000 iterations:\n"); 
 	//Can't run larger than 2048 because of thread constraints
-	for (int psize=1; psize <= 2048; psize *= 2){ //Can't run with bigger pattern.  
+	for (int psize=1000; psize <= 2048; psize += 10){ //Can't run with bigger pattern.  
 		int wsize = 0;
 		for (int iter=0; iter < 1; iter++){
 			//Pick a random location in T to be P with no period
@@ -110,6 +110,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 			srand(time(NULL));
 			ind = rand() % (size - psize); 
 			P = T + ind;
+			if (ind >= size - psize){printf("IND ERROR\n");}
 
 			//Run the serial algorithm
 			cstart();
@@ -201,7 +202,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 			break;
 		}else{
 			//Now print information regarding timing
-			printf("\t\tPattern size: %d\n", psize); 
+			/*printf("\t\tPattern size: %d\n", psize); 
 			printf("\t\tNaive serial time: %f\n", ser/1000);
 			printf("\t\tFailure function time: %f\n", fail/1000);
 			printf("\t\tKMP search time: %f\n", kmp/1000);
@@ -209,7 +210,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 			printf("\t\tInitial copy time: %f\n", copy1 + copy1b/1000);
 			printf("\t\tCopy results time: %f\n", copy2/1000);
 			printf("\t\tClean results time: %f\n", clean/1000); 
-			printf("\t\tWitness creation time: %f\n", witTime/1000); 
+			printf("\t\tWitness creation time: %f\n", witTime/1000);
 			if (flag_Func < 3){
 				printf("\t\tSearch time: %f\n", time1/1000);
 				fprintf(data, "%d;%f;%f;%f\n", psize, ser/1000, (kmp+fail)/1000, time1/1000); 
@@ -219,7 +220,7 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 				printf("\t\tFinish search time: %f\n", time2/1000); 
 				fprintf(data, "%d;%f;%f;%f\n", psize, ser/1000, (kmp+fail)/1000, (time1+time2)/1000);
 			}
-			printf("\t\tTotal time: %f\n\n", copy1 + (copy1b + copy2 + clean + witTime + time1 + time2)/1000);
+			printf("\t\tTotal time: %f\n\n", copy1 + (copy1b + copy2 + clean + witTime + time1 + time2)/1000);*/
 			copy1b = 0;
 			copy2 = 0;
 			clean = 0;
@@ -289,30 +290,33 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 		gstart();
 		search_synced_shared<<<block,wsize>>>(W, wsize, P, psize, T, tsize, R);
 		gend(&temp);
+		cudaDeviceSynchronize();
 		gerror(cudaPeekAtLastError());
 		time1 += temp; 
-		cudaDeviceSynchronize();
 	
 	}
 	if (flag_Func == 3){
 		int div = 1024;
 		int block = tsize/div;
 		if (tsize % div > 0){block += 1;}
+		printf("PRE\n");
 		gstart();
 		createTreeLevel<<<block,div>>>(W, wsize, P, psize, T, tsize, tree, 0);	
 		for (int s = 1; s < wsize; s = 2*s){
 			createTreeLevel<<<block, div>>>(W, wsize, P, psize, T, tsize, tree, s);	
 		}
-		gend(&temp);
-		gerror(cudaPeekAtLastError());
+		gend(&temp); 
 		time1 += temp; 
 		cudaDeviceSynchronize();
+		gerror(cudaPeekAtLastError());
+		printf("MID\n");
 
 		gstart();
 		search_Finish<<<block,div>>>(wsize, P, psize, T, tsize, R, tree);
 		gend(&temp);
 		time2 += temp; 
 		printf("Ind:%d\n", ind); 
+		fflush(stdout); 
 		cudaDeviceSynchronize();
 		gerror(cudaPeekAtLastError());
 	}
