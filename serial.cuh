@@ -49,40 +49,42 @@ __host__ void failure(int* F, char* P, int psize){
 		if (P[k] == P[j]){
 			F[k] = F[j];
 		} else {
-			F[k] = j; 
+			F[k] = j;
 			j = F[j];
-			while ((j >= 0)&&(P[k] != P[j])){
-				j = F[j]; 
+			while ((j >=0)&&(P[k] != P[j])){
+				j = F[j];
 			}
 		}
-		j += 1;
 		k += 1;
+		j += 1;
 	}
-	F[k] = j;
 }
 __host__ void KMP(int* F, char* P, int psize, char* T, int tsize, int* match){
 	//Complete the search
 	int j = 0;
 	int k = 0;
 	int iM = 1;
-	while (k - j <= tsize - psize){
-		if (T[k] == P[j]){
-			j += 1; 
+	while (k < tsize){
+		if (T[k] == P[j]){ 
+			j += 1;
 			k += 1; 
 			if (j == psize){
 				match[iM] = k-j;
-				iM += 1; 
-				j = F[j]; 
+				iM += 1;
+				j = F[j];
+			}else{
+				j += 1; 
+				k += 1;
 			}
 		} else {
-			j = F[j];
-			if (j < 0){
+			k = T[k];
+			if (k < 0){
+				j += 1;
 				k += 1;
-				j += 1; 
 			}
 		}
 	}
-	match[0] = iM-1; 
+	match[0] = iM-1;
 }
 
 #endif

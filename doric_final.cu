@@ -7,8 +7,6 @@
 #include "witness.cuh"
 #include "serial.cuh"
 
-//__constant__ char textC[2048*2048*256];
-
 //Main function ***********************************************************************
 int main(){
 	//Assume this has been run while pulling info from file "DNA.txt"
@@ -23,7 +21,6 @@ int main(){
 	while ((i<tsize)&&(c != EOF)){
 		if ((c != 13)&&(c != 10)&&(c != 0)){
 			text[i] = c;
-			//cudaMemcpyToSymbol(&textC[i],&c,sizeof(char)); 
 			i += 1;		
 		}
 		c = getchar();  
@@ -33,29 +30,94 @@ int main(){
 	tsize = i; 
 
 	warmup<<<1,1>>>(); //Warmup the GPU to ensure accurrate timing
+	gerror(cudaPeekAtLastError()); 
 
 
 	//Now, let's run tests on the GPU versions and compare to CPU results
 	//******************************************************************** 
 
-	//Test: synced parallel version w/global tree and cpu witness
-	FILE *data = fopen("Synced.txt", "w");
-	test(text, tsize, 2, 1, data);
+	FILE *data;
+
+	//FIRST, Generic comparisons and tests on limited text for all four versions
+	int size = 2048*32; //Constraint of constant memory version
+	int maxp = 2048; //Constraint of synced versions
+	int inc = 4; //Do pattern sizes 4,8,12,16,...,2048
+
+	//Test: synced parallel version w/global tree and cpu witness	
+	data = fopen("Synced_WitCPU.txt", "w");
+	test(text, size, 2, 1, data, maxp, inc);
 	printf("\n\n"); 
 	fflush(stdout); 
-	fclose(data);
+	fclose(data);//
 
 	//Test: synced parallel version w/shared tree and cpu witness
-	data = fopen("SyncedShared.txt", "w");
-	test(text, tsize, 2, 2, data); 
+	data = fopen("SyncedShared_WitCPU.txt", "w");
+	test(text, tsize, 2, 2, data, maxp, inc); 
 	printf("\n\n"); 
 	fflush(stdout);//
 	fclose(data);
 
-	//Test: multiple kernel version and cpu witness
-	data = fopen("Multiple.txt", "w");
-	test(text, tsize, 2, 3, data); 
+	//Test: synced parallel version w/global tree and gpu witness
+	data = fopen("Synced_WitGPU.txt", "w");
+	test(text, tsize, 1, 1, data, maxp, inc);
 	printf("\n\n"); 
 	fflush(stdout); 
-	fclose(data); 
+	fclose(data);//
+
+	//Test: synced parallel version w/shared tree and gpu witness
+	data = fopen("SyncedShared_WitGPU.txt", "w");
+	test(text, tsize, 1, 2, data, maxp, inc); 
+	printf("\n\n"); 
+	fflush(stdout);//
+	fclose(data);//*/
+
+	//Test: multiple kernel version and cpu witness
+	data = fopen("Multiple_WitCPU.txt", "w");
+	test(text, tsize, 2, 3, data, maxp, inc); 
+	printf("\n\n"); 
+	fflush(stdout); 
+	fclose(data); 	
+	
+	//Test: multiple kernel version and gpu witness
+	data = fopen("Multiple_WitGPU.txt", "w");
+	test(text, tsize, 1, 3, data, maxp, inc); 
+	printf("\n\n"); 
+	fflush(stdout); 
+	fclose(data); //
+
+	//Test: multiple kernel version and cpu witness
+	//pattern sizes 8,16,24,32...2048
+	data = fopen("MultipleConstant_WitCPU.txt", "w");
+	test(text, tsize, 2, 4, data, maxp, inc); 
+	printf("\n\n"); 
+	fflush(stdout); 
+	fclose(data); 	
+	
+	//Test: multiple kernel version and gpu witness
+	//pattern sizes 8,16,24,32...2048
+	data = fopen("MultipleConstant_WitGPU.txt", "w");
+	test(text, tsize, 1, 4, data, maxp, inc); 
+	printf("\n\n"); 
+	fflush(stdout); 
+	fclose(data);//
+
+	//SECOND, Compare long term Multiple kernel version and serial version on whole text with largest pattern sizes possible
+	//The multiple kernel version encounters an illegal memory access when the pattern sizes is 65537 or larger. So, we will restrict it.
+	maxp = 65537;
+	inc = 50; //To keep the run time of testing down
+	size = tsize; //Run on full thing 
+
+	//Test: multiple kernel version and cpu witness
+	data = fopen("Multiple_WitCPU_WHOLE.txt", "w");
+	test(text, tsize, 2, 3, data, maxp, inc); 
+	printf("\n\n"); 
+	fflush(stdout); 
+	fclose(data); 	
+	
+	//Test: multiple kernel version and gpu witness
+	data = fopen("Multiple_WitGPU_WHOLE.txt", "w");
+	test(text, tsize, 1, 3, data, maxp, inc); 
+	printf("\n\n"); 
+	fflush(stdout); 
+	fclose(data); //
 }

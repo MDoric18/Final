@@ -9,7 +9,7 @@
 #ifndef TEST
 #define TEST
 
-__host__ void test(char*, int, int, int, FILE*); 
+__host__ void test(char*, int, int, int, FILE*, int, int); 
 __host__ void run(int*, int, char*, int, char*, int, int*, int*, int, int); 
 __host__ void printTiming(int, int);
 __global__ void warmup();
@@ -23,9 +23,9 @@ float copy1 = 0;
 float copy1b = 0; 
 float copy2 = 0;
 float witTime = 0;
+float time0 = 0; 
 float time1 = 0;
 float time2 = 0;
-float clean = 0;
 float ser = 0; 
 float kmp = 0; 
 float fail = 0; 
@@ -45,9 +45,13 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 __global__ void warmup(){}
 
-__host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
-	int size = tsize; //4096*1024; 
+__host__ void test(char* T, int size, int flag_W, int flag_Func, FILE* data, int maxp, int inc){
+	if (flag_Func == 4){
+		size = 2048*32; //Max constant memory allowed 
+		
+	} 
 	printf("Testing with text size %d, and pattern sizes 1:1/2*size+1\n", size);
+	fprintf(data, "Pattern Size; Naive Serial; Initial Copy; Copy Results; Witness;");
 	if(flag_W == 1){
 		printf("\tUsing GPU witness function.\n"); 
 	}
@@ -55,16 +59,22 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 		printf("\tUsing CPU witness function.\n");
 	}
 	if(flag_Func == 1){
-		printf("\tUsing Synced Version w/o Shared mem Search Alg.\n");
-		fputs("Pattern Size;Naive Serial;Optimal Serial;Synced Global\n", data);   
+		printf("\tUsing Synced Version w/o Shared mem Search Alg.\n");  
+		fprintf(data, "Synced;\n"); 
 	}
 	if(flag_Func == 2){
 		printf("\tUsing Synced Version w/ Shared mem Search Alg.\n");
-		fputs("Pattern Size;Naive Serial;Optimal Serial;Synced Shared\n", data);   
+		fprintf(data, "Synced Shared;\n");    
 	}
 	if(flag_Func == 3){
 		printf("\tUsing Multiple Kernel Version Search Alg. \n");
-		fputs("Pattern Size;Naive Serial;Optimal Serial;Multiple\n", data);   
+		fprintf(data, "Create Tree; Search;\n"); 
+	}
+	if(flag_Func == 4){
+		printf("\tUsing Multiple Kernel Version With Constant Memory Search Alg. \n");
+		fprintf(data, "Create Tree; Search;\n"); 
+		//Set up constant memory
+		setConstantMem(T, size); 
 	}
 
 	//Setup memory for gpu version
@@ -98,11 +108,14 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 	//Now test, psize must be <=2048 because of synced version thread restraints
 	int success = 1;  
 	//Prep phrase for timing reports
-	printf("The average runtimes in 1000 iterations:\n"); 
-	//Can't run larger than 2048 because of thread constraints
-	for (int psize=1000; psize <= 2048; psize += 10){ //Can't run with bigger pattern.  
+	printf("The average runtimes in 10 iterations:\n"); 
+	//Synced versions can't have pattern sizes larger than 2048 because of thread constraints. 
+	//Multiple kernel version works until 65537. Then encounters illegal memory access. 
+	for (int psize=inc; psize <= maxp; psize += inc){ //Can't run with bigger pattern.  
 		int wsize = 0;
-		for (int iter=0; iter < 1; iter++){
+		printf("%d ", psize); 
+		fflush(stdout); 
+		for (int iter=0; iter < 10; iter++){
 			//Pick a random location in T to be P with no period
 			//int ind;
 			char* P;
@@ -118,13 +131,14 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 			cend(&temp);
 			ser += temp; 
 
-			//Run the optimal algorithm
+			//CAN'T GET THIS TO WORK :(
+			/*//Run the optimal algorithm
 			cstart();
 			failure(F, P, psize);
 			cend(&temp);
 			fail += temp;
 
-			/*cstart();
+			cstart();
 			KMP(F, P, psize, T, size, matchKMP);
 			cend(&temp);
 			kmp += temp; 
@@ -161,7 +175,6 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 			//Now clean up the results (remove -1s and extra 0s)
 			int count = 0;
 			int pastZero = 0; 
-			cstart(); 
 			for (int i=0; i < size; i++){
 				if(pastZero){
 					if (matchGPU[i] > 0){
@@ -176,8 +189,6 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 					}
 				} 
 			} 
-			cend(&temp); 
-			clean += temp; 
 
 			//Now compare results to CPU
 			int end = 0;
@@ -187,8 +198,6 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 					success = 0; 
 					printf("\tERROR, MISMATCH, psize=%d, wsize=%d, loc=%d\n", psize, wsize, ind);
 					printf("Count w/ Pattern size = %d: %d (GPU), %d (CPU)\n", psize, count, match[0]);
-					int block = size/wsize;
-					if (tsize % wsize > 0){block += 1;}
 					end = 1;
 					break; 
 
@@ -201,34 +210,31 @@ __host__ void test(char* T, int tsize, int flag_W, int flag_Func, FILE* data){
 			printf("Failed.\n");
 			break;
 		}else{
-			//Now print information regarding timing
-			/*printf("\t\tPattern size: %d\n", psize); 
-			printf("\t\tNaive serial time: %f\n", ser/1000);
-			printf("\t\tFailure function time: %f\n", fail/1000);
-			printf("\t\tKMP search time: %f\n", kmp/1000);
-			printf("\t\tTotal KMP time: %f\n", (kmp+fail)/1000);  
-			printf("\t\tInitial copy time: %f\n", copy1 + copy1b/1000);
-			printf("\t\tCopy results time: %f\n", copy2/1000);
-			printf("\t\tClean results time: %f\n", clean/1000); 
-			printf("\t\tWitness creation time: %f\n", witTime/1000);
+			//Record Information - Can't get KMP to work
+			fprintf(data, "%d; ", psize); //Pattern size
+			fprintf(data, "%f; ", ser/10); //Serial Time
+			//fprintf(data, "%f; ", fail/10); //Failure Func Time
+			//fprintf(data, "%f; ", kmp/10); //KMP Time
+			fprintf(data, "%f; ", copy1 + copy1b/10); //Initial Copy
+			fprintf(data, "%f; ", copy2/10); //Copy Results
+			fprintf(data, "%f; ", witTime/10); //Witness Time
+	
 			if (flag_Func < 3){
-				printf("\t\tSearch time: %f\n", time1/1000);
-				fprintf(data, "%d;%f;%f;%f\n", psize, ser/1000, (kmp+fail)/1000, time1/1000); 
+				fprintf(data, "%f;\n", time1/10); //Synced Time
 			}
-			if (flag_Func == 3){
-				printf("\t\tCreate tree time: %f\n", time1/1000);
-				printf("\t\tFinish search time: %f\n", time2/1000); 
-				fprintf(data, "%d;%f;%f;%f\n", psize, ser/1000, (kmp+fail)/1000, (time1+time2)/1000);
+			if (flag_Func >= 3){ 
+				fprintf(data, "%f; %f; %f;\n", time0/10, time1/10, time2/10); //Multiple Kernel Time
 			}
-			printf("\t\tTotal time: %f\n\n", copy1 + (copy1b + copy2 + clean + witTime + time1 + time2)/1000);*/
-			copy1b = 0;
+			//Reset Timers (Except Initial)
+			copy1b = 0; 
 			copy2 = 0;
-			clean = 0;
-			witTime = 0; 
+			witTime = 0;
+			time0 = 0; 
 			time1 = 0;
 			time2 = 0;
 			ser = 0; 
-			
+			kmp = 0; 
+			fail = 0; 	
 		}
 		cudaDeviceSynchronize(); 
 	}
@@ -254,8 +260,10 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 	cudaMemcpy(pat, P, sizeof(char)*psize, cudaMemcpyDeviceToHost); 
 	//if flag_W == 1, we get it on the GPU, else get on CPU
 	if (flag_W == 1){
+		int block = wsize/1024;
+		if (wsize % 1024 > 0){block += 1;}
 		gstart();
-		witnessGPU<<<1024,1024>>>(P, psize, W, wsize);
+		witnessGPU<<<block,1024>>>(P, psize, W, wsize);
 		gend(&temp);
 		witTime += temp; 
 		cudaDeviceSynchronize();
@@ -267,6 +275,7 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 			gerror(cudaPeekAtLastError());
 			witTime += temp; 
 			gerror(cudaMemcpy(W, wit, sizeof(int)*wsize, cudaMemcpyHostToDevice)); 
+			
 		}else{ printf("ERROR flag_W\n");} 
 	}
 
@@ -285,6 +294,9 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 		
 	} 
 	if (flag_Func == 2){
+
+
+		
 		int block = tsize/wsize;
 		if (tsize % wsize > 0){block += 1;}
 		gstart();
@@ -293,35 +305,66 @@ __host__ void run(int* W, int wsize, char* P, int psize, char* T, int tsize, int
 		cudaDeviceSynchronize();
 		gerror(cudaPeekAtLastError());
 		time1 += temp; 
+
 	
 	}
 	if (flag_Func == 3){
 		int div = 1024;
 		int block = tsize/div;
 		if (tsize % div > 0){block += 1;}
-		printf("PRE\n");
+
 		gstart();
-		createTreeLevel<<<block,div>>>(W, wsize, P, psize, T, tsize, tree, 0);	
+		setup_Tree<<<block,div>>>(tree, tsize); 
+		gerror(cudaPeekAtLastError()); 
 		for (int s = 1; s < wsize; s = 2*s){
 			createTreeLevel<<<block, div>>>(W, wsize, P, psize, T, tsize, tree, s);	
+			gerror(cudaDeviceSynchronize()); 
 		}
 		gend(&temp); 
 		time1 += temp; 
 		cudaDeviceSynchronize();
 		gerror(cudaPeekAtLastError());
-		printf("MID\n");
-
+		
+		block = tsize/wsize;
+		if (tsize % wsize > 0){block += 1;}
 		gstart();
-		search_Finish<<<block,div>>>(wsize, P, psize, T, tsize, R, tree);
+		search_Finish<<<block, 1>>>(wsize, P, psize, T, tsize, R, tree);
 		gend(&temp);
 		time2 += temp; 
-		printf("Ind:%d\n", ind); 
-		fflush(stdout); 
 		cudaDeviceSynchronize();
 		gerror(cudaPeekAtLastError());
 	}
-	if ((flag_Func > 3)||(flag_Func < 1)){ 
+	if (flag_Func == 4){
+		int div = 1024;
+		int block = tsize/div;
+		if (tsize % div > 0){block += 1;}
+
+		gstart();
+		setup_Tree<<<block,div>>>(tree, tsize); 
+		gerror(cudaPeekAtLastError()); 
+		for (int s = 1; s < wsize; s = 2*s){
+			createTreeLevel_Constant<<<block, div>>>(W, wsize, P, psize, tsize, tree, s);	
+			gerror(cudaDeviceSynchronize()); 
+		}
+		gend(&temp); 
+		time1 += temp; 
+		cudaDeviceSynchronize();
+		gerror(cudaPeekAtLastError());
+		
+		block = tsize/wsize;
+		if (tsize % wsize > 0){block += 1;}
+		gstart();
+		search_Finish_Constant<<<block, 1>>>(wsize, P, psize, tsize, R, tree);
+		gend(&temp);
+		time2 += temp; 
+		cudaDeviceSynchronize();
+		gerror(cudaPeekAtLastError());
+	}
+	if ((flag_Func > 4)||(flag_Func < 1)){ 
 		printf("ERROR flag_Func\n");
 	}
+
+	cudaDeviceSynchronize();
+	gerror(cudaPeekAtLastError());
 }
 #endif
