@@ -29,7 +29,7 @@ __global__ void search_synced(int* W, int wsize, char* P, int psize, char* T, in
 		if ((2*s*threadIdx.x+s < wsize)&&(2*s*threadIdx.x+s+blockStart < tsize)){
 			int i = tree[2*s*threadIdx.x + blockStart];
 			int j = tree[2*s*threadIdx.x + s + blockStart];
-			tree[2*s*threadIdx.x + blockStart] = duel(T, P, W, i, j);
+			tree[2*s*threadIdx.x + blockStart] = duel(T, P, W, i, j, wsize, psize, tsize);
 			if (2*s*threadIdx.x + s + blockStart >= tsize){printf("OoB ERROR\n");}		
 		}
 		__syncthreads(); 
@@ -64,7 +64,9 @@ __global__ void search_synced_shared(int* W, int wsize, char* P, int psize, char
  
 	__shared__ int tree[1024]; //Doesn't work with extern.......
 	int ID = threadIdx.x + blockIdx.x*wsize;
-	tree[threadIdx.x] = ID; 
+	if (ID < tsize){
+		tree[threadIdx.x] = ID; 
+	}
 	
 	__syncthreads(); 
 
@@ -73,7 +75,7 @@ __global__ void search_synced_shared(int* W, int wsize, char* P, int psize, char
 		if ((2*s*threadIdx.x + s < wsize)&&(2*s*threadIdx.x + s + blockIdx.x*wsize < tsize)){ 
 			int i = tree[2*s*threadIdx.x];
 			int j = tree[2*s*threadIdx.x + s];
-			tree[2*s*threadIdx.x] = duel(T, P, W, i, j);
+			tree[2*s*threadIdx.x] = duel(T, P, W, i, j, wsize, psize, tsize);
 		}
 		__syncthreads(); 
 	}
