@@ -46,10 +46,6 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 __global__ void warmup(){}
 
 __host__ void test(char* T, int size, int flag_W, int flag_Func, FILE* data, int maxp, int inc){
-	if (flag_Func == 4){
-		size = 2048*32; //Max constant memory allowed 
-		
-	} 
 	printf("Testing with text size %d, and pattern sizes 1:1/2*size+1\n", size);
 	fprintf(data, "Pattern Size; Naive Serial; Initial Copy; Copy Results; Witness;");
 	if(flag_W == 1){
@@ -131,8 +127,8 @@ __host__ void test(char* T, int size, int flag_W, int flag_Func, FILE* data, int
 			cend(&temp);
 			ser += temp; 
 
-			//CAN'T GET THIS TO WORK :(
-			/*//Run the optimal algorithm
+			/*//DOESN'T WORK
+			//Run the optimal algorithm
 			cstart();
 			failure(F, P, psize);
 			cend(&temp);

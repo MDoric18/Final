@@ -22,7 +22,7 @@ __global__ void setup_Tree(int* tree, int tsize){
 	}
 }
 
-__constant__ char TC[2048*32]; //Max constant memory allowed
+__constant__ char TC[2048*32]; //Max constant memory allowed - Same for NEW and OLD GPUs
 
 __host__ void setConstantMem(char* text, int tsize){
 	cudaMemcpyToSymbol(TC, text, tsize*sizeof(char));  

@@ -51,13 +51,13 @@ __host__ void failure(int* F, char* P, int psize){
 		} else {
 			F[k] = j;
 			j = F[j];
-			while ((j >=0)&&(P[k] != P[j])){
+			while ((j >= 0)&&(P[k] != P[j])){
 				j = F[j];
 			}
 		}
 		k += 1;
 		j += 1;
-	}
+	}  
 }
 __host__ void KMP(int* F, char* P, int psize, char* T, int tsize, int* match){
 	//Complete the search
@@ -72,12 +72,9 @@ __host__ void KMP(int* F, char* P, int psize, char* T, int tsize, int* match){
 				match[iM] = k-j;
 				iM += 1;
 				j = F[j];
-			}else{
-				j += 1; 
-				k += 1;
 			}
 		} else {
-			k = T[k];
+			k = F[k];
 			if (k < 0){
 				j += 1;
 				k += 1;

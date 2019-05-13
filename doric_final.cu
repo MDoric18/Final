@@ -38,10 +38,25 @@ int main(){
 
 	FILE *data;
 
-	int size = 2048*32; //Constraint of constant memory version
-	int maxp = size; 
-	int inc = 50; //Large to speed up data collection
+	//Was going to get run times for KMP, but KMP doesn't work. I was mistaken. 
+	/*//Get run times for KMP
+	//The multiple kernel version encounters an illegal memory access when the pattern sizes is 65537 or larger. So, we will restrict it.
+	int maxp = 65537;
+	int inc = 4; //To keep the run time of testing down
+	int size = 10; //Run on full thing 
 
+	//Test: multiple kernel version and cpu witness
+	data = fopen("KMPvsMultiple.txt", "w");
+	test(text, tsize, 2, 4, data, maxp, inc); 
+	printf("\n\n"); 
+	fflush(stdout); 
+	fclose(data);//*/
+
+	//FROM HERE ON, KMP WAS COMMENTED OUT to speed up data collection
+	//Second, test constant memory on large pattern sizes. 
+	size = 2048*32; //Constraint of constant memory version
+	maxp = size; 
+	inc = 50; //Large to speed up data collection
 	//Test: Multiple Kernel Constant Mem on largest patterns possible
 	data = fopen("Constant.txt", "w");
 	test(text, size, 2, 4, data, maxp, inc);
@@ -49,7 +64,7 @@ int main(){
 	fflush(stdout);
 	fclose(data); //*/ 
 
-	//FIRST, Generic comparisons and tests on limited text for all four versions
+	//Next, Generic comparisons and tests on limited text for all four versions
 	//Test: synced parallel version w/global tree and cpu witness
 	maxp = 2048; //Constraint of synced versions
 	inc = 4; //Do pattern sizes 4,8,12,16,...,2048
@@ -106,28 +121,6 @@ int main(){
 	//pattern sizes 8,16,24,32...2048
 	data = fopen("MultipleConstant_WitGPU.txt", "w");
 	test(text, tsize, 1, 4, data, maxp, inc); 
-	printf("\n\n"); 
-	fflush(stdout); 
-	fclose(data);//*/
-
-
-	//Did generate this data below but didn't talk about it
-	//SECOND, Compare long term Multiple kernel version and serial version on whole text with largest pattern sizes possible
-	//The multiple kernel version encounters an illegal memory access when the pattern sizes is 65537 or larger. So, we will restrict it.
-	maxp = 65537;
-	inc = 50; //To keep the run time of testing down
-	size = tsize; //Run on full thing 
-
-	//Test: multiple kernel version and cpu witness
-	data = fopen("Multiple_WitCPU_WHOLE.txt", "w");
-	test(text, tsize, 2, 3, data, maxp, inc); 
-	printf("\n\n"); 
-	fflush(stdout); 
-	fclose(data);//*/
-	
-	//Test: multiple kernel version and gpu witness
-	data = fopen("Multiple_WitGPU_WHOLE.txt", "w");
-	test(text, tsize, 1, 3, data, maxp, inc); 
 	printf("\n\n"); 
 	fflush(stdout); 
 	fclose(data);//*/
